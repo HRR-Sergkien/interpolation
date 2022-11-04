@@ -35,7 +35,7 @@ def read_fits(which_params,fits_file):
     hdu.close()
     return param_vals,wave_model,flux_model,model_name  #Returns the values of the specified parameters, and wavelength and flux of each model
 
-
+#Comentario de prueba para github...
 #def grid_mods(wwave,fold_name,which_params):
 #    return grid_mods_tuple(tuple(wwave), fold_name,tuple(which_params))
 
