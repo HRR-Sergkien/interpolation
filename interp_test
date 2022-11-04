@@ -63,7 +63,7 @@ def grid_mods(wwave,fold_name,which_params):
 
         elif ext=='fits':
             hdu=fits.open(fichero)
-            #if hdu[0].header['teff']==16100 or hdu[0].header['h']!=-4.1: continue
+            if hdu[0].header['teff']==16100 or hdu[0].header['h']!=-4.1: continue
             else:
                 param_vals,wave_model,flux_model,model_name=read_fits(which_params,fichero)
                 int_mod = interpolate.interp1d(wave_model,flux_model,kind='linear')
