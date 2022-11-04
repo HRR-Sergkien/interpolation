@@ -51,7 +51,7 @@ def grid_mods(wwave,fold_name,which_params):
         tic = time.perf_counter()
         #which_params,wave_model,flux_model,model_name=[],[],[],[]
         print(fichero)
-        if ext=='dk':   #This method is still not generalized. It just takes the parameters from the name
+        if ext=='dk':   #This method is still not generalized. It just takes the parameters from the name. Try to generalize
             wave_model,flux_model=np.loadtxt(fichero,skiprows=46,unpack=True)
             s=len(fold_name)
             teff_name,logg_name,comps_name,siabs_name=fichero[s:].split('.')[0].split('_')
