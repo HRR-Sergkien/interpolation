@@ -3,7 +3,7 @@
 """
 Created on Wed Aug 24 13:25:17 2022
 
-@author: Paula Izquierdo Sanchez and Sergio H. Ramirez
+@author: Paula izquierdo sanchez and Sergio H. Ramirez
 """
 
 import numpy as np
@@ -40,13 +40,13 @@ def read_fits(which_params,fits_file):
 #    return grid_mods_tuple(tuple(wwave), fold_name,tuple(which_params))
 
 #@lru_cache(maxsize=10)
-def grid_mods(wwave,fold_name,which_params):
+def grid_mods(wwave,fold_name,which_params,extension='fits'):
 
     dic = {}
     master_param=[]
     which_teffs, which_loggs, which_comps, which_siabs = [], [], [], []
     #ficheros=glob
-    ext='dk'
+    ext=extension
     for fichero in glob.glob(fold_name+'*.'+ext):
         tic = time.perf_counter()
         #which_params,wave_model,flux_model,model_name=[],[],[],[]
@@ -56,23 +56,25 @@ def grid_mods(wwave,fold_name,which_params):
             wave_model,flux_model=np.loadtxt(fichero,skiprows=60,unpack=True)
             s=len(fold_name)
             teff_name,logg_name,comps_name,siabs_name=fichero[s:].split('.')[0].split('_')
-            name=teff_name+','+logg_name+','+comps_name[1:]+','+siabs_name[2:]
-            siabs=float(format(int(siabs_name[2:]),'.2f'))
-            teff=int(teff_name)
-            comps=float(format(int(comps_name[1:]),'.2f'))
-            logg=float(format(int(logg_name),'.2f'))
-            param_vals=[teff,logg,comps,siabs]
-            int_mod = interpolate.interp1d(wave_model,flux_model,kind='linear')
-            dic[tuple(param_vals)] = int_mod(wwave)
-            master_param.append(param_vals)
+            if teff_name=='16100': continue
+            else:
+                name=teff_name+','+logg_name+','+comps_name[1:]+','+siabs_name[2:]
+                siabs=float(format(int(siabs_name[2:]),'.2f'))
+                teff=np.log10(int(teff_name))
+                comps=float(format(int(comps_name[1:]),'.2f'))
+                logg=float(format(int(logg_name),'.2f'))
+                param_vals=[teff,logg,comps,siabs]
+                int_mod = interpolate.interp1d(wave_model,flux_model,kind='linear')
+                dic[tuple(param_vals)] = np.log10(int_mod(wwave))
+                master_param.append(param_vals)
 
         elif ext=='fits':
             hdu=fits.open(fichero)
-            if hdu[0].header['teff']==16100 or hdu[0].header['h']!=-4.1: continue
+            if hdu[0].header['teff']==16100: continue#log10 must not be applied here, because this is being read directly from the header
             else:
                 param_vals,wave_model,flux_model,model_name=read_fits(which_params,fichero)
                 int_mod = interpolate.interp1d(wave_model,flux_model,kind='linear')
-                dic[tuple(param_vals)] = int_mod(wwave)
+                dic[tuple(param_vals)] = np.log10(int_mod(wwave))
                 master_param.append(param_vals)  #master param is the list of lists of parameters of each file
 
         else:
@@ -117,15 +119,24 @@ steps_models = 0.15
 wave_peo = np.arange(3100,6700,steps_models)
 res_uvb, res_vis = 5400, 8900
 
-
+ext='dk'
 params=['teff','logg','h']
-#numbers = np.array([np.log10(16100),7.5,-4.1])
-numbers=np.array([16100,750,410,1200])
-#which_fold = 'Modelos_J0827/'
-which_fold='InterpolationTest_DBA_2_dk/'
+
+
+
+if ext=='fits':
+    numbers = np.array([np.log10(16100),7.5,-4.1])
+    which_fold = 'InterpolationTest_DBA_2/'
+
+elif ext=='dk':
+    which_fold='InterpolationTest_DBA_2_dk/'
+    numbers = np.array([np.log10(16100),750,410,1200])
+#numbers=np.array([np.log10(16100),750,410,1200])
+#which_fold = 'InterpolationTest_DBA_2/'
+
 hdus=glob.glob(which_fold+'*.fits')
 print('Uploading models')
-mod_library, params_wh,index_wh,len_wh= grid_mods(wave_peo, which_fold,params)
+mod_library, params_wh,index_wh,len_wh= grid_mods(wave_peo, which_fold,params,extension=ext)
 
 print('Models uploaded')
 print(params_wh)
@@ -153,7 +164,7 @@ if method=='linear':
     for idx in range(len(perm_index)):
         #if
         print(perm_names[idx])
-        supreme_matrix[perm_index[idx]] = mod_library[perm_names[idx]]
+        supreme_matrix[perm_index[idx]] = mod_library[perm_names[idx]]#this matrix is what is fed into the interpolator function
     interp=RegularGridInterpolator(params_wh, supreme_matrix, method = method)
     interp_spec=interp(numbers)[0]
 
@@ -176,11 +187,25 @@ else:
 
 np.savetxt("regulargrid_200.txt",interp_spec)
 # PLOT RESULTS
-#hdu_model=fits.open(which_fold+'16100_750_H410_Si1200.fits')
-#flux_mod=hdu_model[1].data['flux']
-#wave_mod=hdu_model[1].data['wavelength']
-#int_mod=interpolate.interp1d(wave_mod,flux_mod,kind='linear')
-#mod_library[tuple(numbers)]=int_mod(wave_peo)
+
+
+
+#The if cases for 'fits' and 'dk' files could be improved but since we won't be using dk files...why bother XD
+if ext=='fits':
+    hdu_model=fits.open(which_fold+'16100_750_H410_Si1200.fits')
+    flux_mod=hdu_model[1].data['flux']
+    wave_mod=hdu_model[1].data['wavelength']
+
+elif ext=='dk':
+    wave_mod,flux_mod=np.loadtxt(which_fold+'16100_750_H410_Si1200.dk',skiprows=60,unpack=True)
+    int_mod=interpolate.interp1d(wave_mod,flux_mod,kind='linear')
+    #mod_library[tuple(numbers)]=int_mod(wave_peo)
+
+
+int_mod=interpolate.interp1d(wave_mod,flux_mod,kind='linear')
+mod_library[tuple(numbers)]=np.log10(int_mod(wave_peo))
+
+
 
 #paula_interp = generator_mods(numbers)
 
@@ -188,13 +213,20 @@ fig = plt.figure()
 gs = fig.add_gridspec(2, hspace=0)
 axs = gs.subplots(sharex=True)
 #axs[0].plot(wave_peo,mod_4D_teff_logg_comp_si,'r-',label='Paula linear_interp')
-axs[0].plot(wave_peo,mod_library[(16200,750,410,1200)], label='16200')
-axs[0].plot(wave_peo,mod_library[(16000,750,410,1200)],label='16000')
-axs[0].plot(wave_peo,interp_spec,'k-',label='RegularGridInterp linear')
-axs[0].plot(wave_peo,mod_library[tuple(numbers)],label='model teff:16100')
+
+if ext=='dk':
+    axs[0].plot(wave_peo,np.power(10,mod_library[(np.log10(16200),750,410,1200)]), label='16200')
+    axs[0].plot(wave_peo,np.power(10,mod_library[(np.log10(16000),750,410,1200)]),label='16000')
+
+elif ext =='fits':
+    axs[0].plot(wave_peo,np.power(10,mod_library[(np.log10(16200),7.50,-4.10)]), label='16200')
+    axs[0].plot(wave_peo,np.power(10,mod_library[(np.log10(16000),7.50,-4.10)]),label='16000')
+
+axs[0].plot(wave_peo,np.power(10,interp_spec),'k-',label='RegularGridInterp linear')
+axs[0].plot(wave_peo,np.power(10,mod_library[tuple(numbers)]),label='model teff:16100')
 #plt.title("LOG10(Teff)")
 axs[0].legend()
-axs[1].plot(wave_peo,interp_spec-mod_library[tuple(numbers)],'b.',label='difference')
+percentage=100*(np.power(10,interp_spec)-np.power(10,mod_library[tuple(numbers)]))/np.power(10,mod_library[tuple(numbers)])
+axs[1].plot(wave_peo,percentage,'b.',label='difference')
 axs[1].legend()
 plt.show()
-
